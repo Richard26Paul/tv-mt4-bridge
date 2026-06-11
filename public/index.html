@@ -1,0 +1,830 @@
+<!-- public/index.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TradingView to MT4 Bridge | Webhook Manager</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            color: #eee;
+            min-height: 100vh;
+        }
+        
+        /* Header */
+        .header {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 20px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .header h1 {
+            font-size: 24px;
+            margin-bottom: 5px;
+        }
+        
+        .header p {
+            color: #888;
+            font-size: 14px;
+        }
+        
+        /* Navigation */
+        .nav {
+            display: flex;
+            gap: 10px;
+            padding: 15px 20px;
+            background: rgba(0, 0, 0, 0.2);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .nav button {
+            background: transparent;
+            border: 1px solid #00adb5;
+            color: #00adb5;
+            padding: 8px 20px;
+            cursor: pointer;
+            border-radius: 5px;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+        
+        .nav button:hover, .nav button.active {
+            background: #00adb5;
+            color: #fff;
+        }
+        
+        /* Main content */
+        .container {
+            padding: 20px;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        
+        .tab {
+            display: none;
+        }
+        
+        .tab.active {
+            display: block;
+        }
+        
+        /* Cards */
+        .card {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .card h3 {
+            margin-bottom: 15px;
+            color: #00adb5;
+        }
+        
+        /* Status indicators */
+        .status-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        
+        .status-online {
+            background: #00c853;
+            color: #fff;
+        }
+        
+        .status-offline {
+            background: #d32f2f;
+            color: #fff;
+        }
+        
+        .badge-success {
+            background: #00c853;
+            color: #fff;
+        }
+        
+        .badge-warning {
+            background: #ff9800;
+            color: #fff;
+        }
+        
+        .badge-danger {
+            background: #d32f2f;
+            color: #fff;
+        }
+        
+        /* Log table */
+        .logs-table {
+            width: 100%;
+            overflow-x: auto;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        th {
+            background: rgba(0, 0, 0, 0.3);
+            color: #00adb5;
+            font-weight: 600;
+        }
+        
+        tr:hover {
+            background: rgba(255, 255, 255, 0.03);
+        }
+        
+        /* Form elements */
+        input, select, textarea {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            padding: 8px 12px;
+            color: #fff;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+        
+        input:focus, select:focus {
+            outline: none;
+            border-color: #00adb5;
+        }
+        
+        button {
+            background: #00adb5;
+            border: none;
+            color: #fff;
+            padding: 8px 16px;
+            cursor: pointer;
+            border-radius: 5px;
+            font-size: 14px;
+            transition: background 0.3s;
+        }
+        
+        button:hover {
+            background: #00838f;
+        }
+        
+        button.danger {
+            background: #d32f2f;
+        }
+        
+        button.danger:hover {
+            background: #b71c1c;
+        }
+        
+        /* Webhook URL display */
+        .webhook-url {
+            background: #000;
+            padding: 10px;
+            border-radius: 5px;
+            font-family: monospace;
+            margin: 10px 0;
+            word-break: break-all;
+        }
+        
+        /* Test panel */
+        .test-panel {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 15px;
+            border-radius: 5px;
+            margin-top: 10px;
+        }
+        
+        .test-panel textarea {
+            width: 100%;
+            font-family: monospace;
+            margin: 10px 0;
+        }
+        
+        /* Settings grid */
+        .settings-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+        }
+        
+        .setting-group {
+            margin-bottom: 15px;
+        }
+        
+        .setting-group label {
+            display: block;
+            margin-bottom: 5px;
+            color: #aaa;
+            font-size: 12px;
+        }
+        
+        .setting-group input, .setting-group select {
+            width: 100%;
+        }
+        
+        /* Stats */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .stat-card {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 15px;
+            border-radius: 10px;
+            text-align: center;
+        }
+        
+        .stat-value {
+            font-size: 32px;
+            font-weight: bold;
+            color: #00adb5;
+        }
+        
+        .stat-label {
+            font-size: 12px;
+            color: #888;
+            margin-top: 5px;
+        }
+        
+        /* Payload preview */
+        .payload-preview {
+            background: #1e1e1e;
+            padding: 10px;
+            border-radius: 5px;
+            font-family: monospace;
+            font-size: 12px;
+            overflow-x: auto;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+        
+        /* Footer */
+        .footer {
+            text-align: center;
+            padding: 20px;
+            color: #666;
+            font-size: 12px;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            margin-top: 20px;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        
+        .live-indicator {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #00c853;
+            animation: pulse 2s infinite;
+            margin-right: 8px;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>📡 Beto's TradingView to MT4 Bridge</h1>
+        <p>Webhook receiver for automated trading signals</p>
+    </div>
+    
+    <div class="nav">
+        <button class="tab-btn active" data-tab="dashboard">📊 Dashboard</button>
+        <button class="tab-btn" data-tab="logs">📜 Webhook Logs</button>
+        <button class="tab-btn" data-tab="settings">⚙️ Settings</button>
+        <button class="tab-btn" data-tab="debug">🐛 Debug Console</button>
+        <button class="tab-btn" data-tab="ea">🤖 MT4 Expert Advisor</button>
+    </div>
+    
+    <div class="container">
+        <!-- Dashboard Tab -->
+        <div id="dashboard" class="tab active">
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-value" id="totalSignals">0</div>
+                    <div class="stat-label">Total Signals Received</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="acceptedSignals">0</div>
+                    <div class="stat-label">Accepted Signals</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="rejectedSignals">0</div>
+                    <div class="stat-label">Rejected Signals</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="uptime">0s</div>
+                    <div class="stat-label">Uptime</div>
+                </div>
+            </div>
+            
+            <div class="card">
+                <h3>🌐 Webhook Configuration</h3>
+                <div class="webhook-url" id="webhookUrl">Loading...</div>
+                <div style="margin-top: 10px;">
+                    <span class="status-badge status-online" id="bridgeStatus">● Bridge Online</span>
+                    <span class="status-badge" id="mt4Status" style="background: #ff9800;">● Waiting</span>
+                </div>
+                <p style="margin-top: 10px; font-size: 12px; color: #888;">
+                    💡 Include this header in TradingView webhook: <code>X-Webhook-Token: your-secret-token</code>
+                </p>
+            </div>
+            
+            <div class="card">
+                <h3>📝 Recent Signals</h3>
+                <div id="recentSignals">
+                    <p style="color: #888;">No recent signals...</p>
+                </div>
+            </div>
+            
+            <div class="card">
+                <h3>🧪 Test Webhook</h3>
+                <div class="test-panel">
+                    <label>Test Payload (JSON):</label>
+                    <textarea id="testPayload" rows="6">{
+  "action": "BUY",
+  "symbol": "EURUSD",
+  "price": 1.09250,
+  "quantity": 0.1,
+  "comment": "Test from dashboard",
+  "strategy": "Demo Strategy"
+}</textarea>
+                    <button onclick="sendTestWebhook()" style="margin-top: 10px;">🚀 Send Test Signal</button>
+                    <div id="testResult" style="margin-top: 10px; font-size: 12px;"></div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Webhook Logs Tab -->
+        <div id="logs" class="tab">
+            <div class="card">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                    <h3>📋 Webhook Request Logs</h3>
+                    <div>
+                        <button onclick="refreshLogs()" style="margin-right: 10px;">🔄 Refresh</button>
+                        <button onclick="clearLogs()" class="danger">🗑️ Clear All Logs</button>
+                    </div>
+                </div>
+                <div class="logs-table">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Time</th>
+                                <th>Status</th>
+                                <th>IP Address</th>
+                                <th>Action</th>
+                                <th>Symbol</th>
+                                <th>Preview</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody id="logsTableBody">
+                            <tr><td colspan="7" style="text-align: center;">Loading logs...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Settings Tab -->
+        <div id="settings" class="tab">
+            <div class="card">
+                <h3>⚙️ Bridge Configuration</h3>
+                <form id="configForm">
+                    <div class="settings-grid">
+                        <div class="setting-group">
+                            <label>Port Number</label>
+                            <input type="number" id="port" name="port">
+                        </div>
+                        <div class="setting-group">
+                            <label>Secret Token</label>
+                            <input type="text" id="secretToken" name="secretToken" placeholder="Change this for security">
+                        </div>
+                        <div class="setting-group">
+                            <label>MT4 Output Method</label>
+                            <select id="mt4OutputMethod" name="mt4OutputMethod">
+                                <option value="file">File-Based (Recommended)</option>
+                                <option value="http">HTTP Bridge</option>
+                            </select>
+                        </div>
+                        <div class="setting-group" id="httpEndpointGroup">
+                            <label>MT4 HTTP Endpoint</label>
+                            <input type="text" id="mt4HttpEndpoint" name="mt4HttpEndpoint" placeholder="http://localhost:8080/webhook">
+                        </div>
+                        <div class="setting-group">
+                            <label>MT4 Data Folder</label>
+                            <input type="text" id="mt4DataFolder" name="mt4DataFolder">
+                        </div>
+                        <div class="setting-group">
+                            <label>Log Retention (days)</label>
+                            <input type="number" id="logRetentionDays" name="logRetentionDays">
+                        </div>
+                    </div>
+                    <button type="submit">💾 Save Configuration</button>
+                    <button type="button" onclick="restartBridge()" style="margin-left: 10px; background: #ff9800;">🔄 Restart Bridge</button>
+                </form>
+            </div>
+        </div>
+        
+        <!-- Debug Console Tab -->
+        <div id="debug" class="tab">
+            <div class="card">
+                <h3>🐛 Live Debug Console</h3>
+                <div id="debugConsole" style="background: #0a0a0a; height: 400px; overflow-y: auto; font-family: monospace; font-size: 12px; padding: 15px; border-radius: 5px;">
+                    <div style="color: #00adb5;">[Bridge] Debug console ready - listening for webhook events...</div>
+                </div>
+                <div style="margin-top: 10px;">
+                    <button onclick="clearDebugConsole()">Clear Console</button>
+                    <button onclick="exportDebugLogs()">Export Logs</button>
+                </div>
+            </div>
+            
+            <div class="card">
+                <h3>📊 Sample TradingView Alert Payloads</h3>
+                <h4>Basic Format (GBB_lib_webhook) [citation:10]</h4>
+                <div class="payload-preview">{
+  "action": "BUY",
+  "ticker": "EURUSD",
+  "exchange": "FOREX",
+  "interval": "15",
+  "price": 1.09250,
+  "open": 1.09100,
+  "high": 1.09300,
+  "low": 1.09050,
+  "volume": 15234,
+  "time": "2024-01-15 14:30:00",
+  "comment": "EMA Crossover Signal",
+  "qty": 0.1,
+  "sl": 1.09000,
+  "tp": 1.09500,
+  "strategy": "EMA_Cross_5_9"
+}</div>
+                <h4 style="margin-top: 15px;">Simple Format</h4>
+                <div class="payload-preview">{
+  "action": "BUY",
+  "symbol": "EURUSD",
+  "price": 1.09250,
+  "quantity": 0.1
+}</div>
+                <h4 style="margin-top: 15px;">MA Cross Format (JSON Alert Generation) [citation:1]</h4>
+                <div class="payload-preview">{
+  "Exchange": "NSE",
+  "Symbol": "NIFTY",
+  "Fast_MA": "23145.50",
+  "Slow_MA": "23102.30",
+  "LTP": "23160.00",
+  "Cross_Alert": "Uptrend"
+}</div>
+            </div>
+        </div>
+        
+        <!-- MT4 Expert Advisor Tab -->
+        <div id="ea" class="tab">
+            <div class="card">
+                <h3>🤖 MT4 Expert Advisor (EA) Installation</h3>
+                <p>Download the MT4 Expert Advisor file and install it in MetaTrader 4 to automatically execute trades from webhook signals.</p>
+                
+                <div style="background: #1e1e1e; padding: 20px; border-radius: 10px; margin: 20px 0;">
+                    <h4>📥 Installation Instructions:</h4>
+                    <ol style="margin-left: 20px; line-height: 1.8;">
+                        <li>Click the "Download EA File" button below to get <code>TradingViewBridge_EA.mq4</code></li>
+                        <li>Open MetaTrader 4</li>
+                        <li>Go to <code>File → Open Data Folder</code></li>
+                        <li>Navigate to <code>MQL4 → Experts</code></li>
+                        <li>Copy the downloaded <code>.mq4</code> file into the Experts folder</li>
+                        <li>In MT4, open the MetaEditor (F4) and compile the EA (F7)</li>
+                        <li>Or right-click in Navigator → Refresh to see the EA</li>
+                        <li>Drag the EA onto your chart</li>
+                        <li>Configure input parameters as needed</li>
+                    </ol>
+                </div>
+                
+                <div style="background: #1e1e1e; padding: 20px; border-radius: 10px; margin: 20px 0;">
+                    <h4>⚙️ EA Configuration Parameters:</h4>
+                    <table style="width: 100%;">
+                        <tr><td style="width: 200px;">DataFolder</td><td>Folder name for signal files (default: "Bridge_Data")</td></tr>
+                        <tr><td>CheckInterval</td><td>How often to check for new signals (seconds)</td></tr>
+                        <tr><td>UseFileLogging</td><td>Enable detailed logging to files</td></tr>
+                        <tr><td>DefaultLotSize</td><td>Default lot size if not specified in signal</td></tr>
+                        <tr><td>Slippage</td><td>Slippage allowance in points</td></tr>
+                        <tr><td>AutoClose</td><td>Auto-close opposite positions before opening new ones</td></tr>
+                        <tr><td>MagicNumberStr</td><td>Unique identifier for EA's trades</td></tr>
+                    </table>
+                </div>
+                
+                <div style="display: flex; gap: 15px;">
+                    <button onclick="downloadEA()" style="font-size: 16px; padding: 12px 24px;">📥 Download Expert Advisor File</button>
+                    <button onclick="showEACode()" style="background: #ff9800; font-size: 16px; padding: 12px 24px;">📄 View Source Code</button>
+                </div>
+                
+                <div id="eaCodeDisplay" style="display: none; margin-top: 20px;">
+                    <h4>EA Source Code:</h4>
+                    <div class="payload-preview" id="eaCodeContent" style="max-height: 400px; overflow-y: auto;"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="footer">
+        <p>TradingView to MT4 Bridge v1.0 | Securely forward webhook signals to MetaTrader 4</p>
+    </div>
+    
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        let socket = null;
+        let debugLogs = [];
+        
+        // Initialize WebSocket
+        function initWebSocket() {
+            socket = io();
+            
+            socket.on('connect', () => {
+                addDebugMessage('[WebSocket] Connected to bridge server', 'success');
+                socket.emit('get-logs');
+            });
+            
+            socket.on('new-log', (log) => {
+                addDebugMessage(`[Webhook] ${log.status} - ${JSON.stringify(log.payload).substring(0, 100)}`, 
+                    log.status === 'ACCEPTED' ? 'success' : 'warning');
+                refreshLogs();
+                updateStats();
+            });
+            
+            socket.on('initial-logs', (logs) => {
+                addDebugMessage(`[System] Loaded ${logs.length} historical log entries`, 'info');
+            });
+            
+            socket.on('disconnect', () => {
+                addDebugMessage('[WebSocket] Disconnected from server', 'error');
+            });
+        }
+        
+        // Load initial data
+        async function loadConfig() {
+            const response = await fetch('/api/config');
+            const config = await response.json();
+            
+            document.getElementById('port').value = config.port;
+            document.getElementById('secretToken').value = config.secretToken === '***hidden***' ? '' : config.secretToken;
+            document.getElementById('mt4OutputMethod').value = config.mt4OutputMethod;
+            document.getElementById('mt4HttpEndpoint').value = config.mt4HttpEndpoint;
+            document.getElementById('mt4DataFolder').value = config.mt4DataFolder;
+            document.getElementById('logRetentionDays').value = config.logRetentionDays;
+            
+            // Show/hide HTTP endpoint field
+            toggleHttpEndpoint(config.mt4OutputMethod === 'http');
+            
+            // Update webhook URL display
+            const webhookUrl = `${window.location.protocol}//${window.location.hostname}:${config.port}/webhook`;
+            document.getElementById('webhookUrl').innerHTML = `<strong>Webhook URL:</strong> ${webhookUrl}<br><strong>Token:</strong> ${config.secretToken === '***hidden***' ? 'Configured' : config.secretToken}`;
+        }
+        
+        function toggleHttpEndpoint(show) {
+            document.getElementById('httpEndpointGroup').style.display = show ? 'block' : 'none';
+        }
+        
+        // Save configuration
+        document.getElementById('configForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const config = {
+                port: parseInt(document.getElementById('port').value),
+                secretToken: document.getElementById('secretToken').value,
+                mt4OutputMethod: document.getElementById('mt4OutputMethod').value,
+                mt4HttpEndpoint: document.getElementById('mt4HttpEndpoint').value,
+                mt4DataFolder: document.getElementById('mt4DataFolder').value,
+                logRetentionDays: parseInt(document.getElementById('logRetentionDays').value)
+            };
+            
+            const response = await fetch('/api/config', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(config)
+            });
+            
+            if (response.ok) {
+                addDebugMessage('[Config] Settings saved successfully', 'success');
+                alert('Configuration saved! Restart the bridge for changes to take effect.');
+            } else {
+                addDebugMessage('[Config] Failed to save settings', 'error');
+                alert('Failed to save configuration');
+            }
+        });
+        
+        // Refresh logs
+        async function refreshLogs() {
+            const response = await fetch('/api/logs?limit=50');
+            const logs = await response.json();
+            
+            const tbody = document.getElementById('logsTableBody');
+            if (logs.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="7" style="text-align: center;">No logs yet</td></tr>';
+                return;
+            }
+            
+            tbody.innerHTML = logs.map(log => `
+                <tr>
+                    <td>${new Date(log.timestamp).toLocaleString()}</td>
+                    <td><span class="status-badge ${log.status === 'ACCEPTED' ? 'badge-success' : (log.status === 'REJECTED' ? 'badge-danger' : 'badge-warning')}">${log.status}</span></td>
+                    <td>${log.ip}</td>
+                    <td>${log.payload?.action || log.payload?.Cross_Alert || 'N/A'}</td>
+                    <td>${log.payload?.symbol || log.payload?.Symbol || 'N/A'}</td>
+                    <td><div style="max-width: 200px; overflow: hidden; text-overflow: ellipsis;">${JSON.stringify(log.payload).substring(0, 50)}...</div></td>
+                    <td><button onclick="deleteLog(${log.id})" style="background: #d32f2f; padding: 4px 8px;">Delete</button></td>
+                </tr>
+            `).join('');
+        }
+        
+        async function deleteLog(id) {
+            await fetch(`/api/logs/${id}`, { method: 'DELETE' });
+            refreshLogs();
+            updateStats();
+        }
+        
+        async function clearLogs() {
+            if (confirm('Are you sure you want to clear all logs?')) {
+                await fetch('/api/logs', { method: 'DELETE' });
+                refreshLogs();
+                updateStats();
+                addDebugMessage('[Logs] All logs cleared', 'warning');
+            }
+        }
+        
+        // Update statistics
+        async function updateStats() {
+            const response = await fetch('/api/status');
+            const status = await response.json();
+            
+            const logsResponse = await fetch('/api/logs?limit=500');
+            const logs = await logsResponse.json();
+            
+            const total = logs.length;
+            const accepted = logs.filter(l => l.status === 'ACCEPTED').length;
+            const rejected = logs.filter(l => l.status === 'REJECTED').length;
+            
+            document.getElementById('totalSignals').textContent = total;
+            document.getElementById('acceptedSignals').textContent = accepted;
+            document.getElementById('rejectedSignals').textContent = rejected;
+            document.getElementById('uptime').textContent = formatUptime(status.uptime);
+        }
+        
+        function formatUptime(seconds) {
+            const days = Math.floor(seconds / 86400);
+            const hours = Math.floor((seconds % 86400) / 3600);
+            const minutes = Math.floor((seconds % 3600) / 60);
+            const secs = Math.floor(seconds % 60);
+            
+            if (days > 0) return `${days}d ${hours}h`;
+            if (hours > 0) return `${hours}h ${minutes}m`;
+            if (minutes > 0) return `${minutes}m ${secs}s`;
+            return `${secs}s`;
+        }
+        
+        // Send test webhook
+        async function sendTestWebhook() {
+            const payload = document.getElementById('testPayload').value;
+            const token = document.getElementById('secretToken').value || 'your-secret-token-change-this';
+            
+            try {
+                const response = await fetch('/webhook', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Webhook-Token': token
+                    },
+                    body: payload
+                });
+                
+                const result = await response.json();
+                document.getElementById('testResult').innerHTML = `
+                    <div style="color: ${response.ok ? '#00c853' : '#d32f2f'}">
+                        ${response.ok ? '✅' : '❌'} Test ${response.ok ? 'Successful' : 'Failed'}: ${JSON.stringify(result)}
+                    </div>
+                `;
+                
+                if (response.ok) {
+                    refreshLogs();
+                    updateStats();
+                    addDebugMessage('[Test] Test webhook sent successfully', 'success');
+                }
+            } catch (error) {
+                document.getElementById('testResult').innerHTML = `<div style="color: #d32f2f;">❌ Error: ${error.message}</div>`;
+                addDebugMessage(`[Test] Error: ${error.message}`, 'error');
+            }
+        }
+        
+        // Download EA
+        async function downloadEA() {
+            window.location.href = '/api/generate-ea';
+            addDebugMessage('[EA] Expert Advisor file download started', 'info');
+        }
+        
+        async function showEACode() {
+            const response = await fetch('/api/generate-ea');
+            const code = await response.text();
+            
+            document.getElementById('eaCodeContent').textContent = code;
+            document.getElementById('eaCodeDisplay').style.display = 'block';
+            addDebugMessage('[EA] EA source code displayed', 'info');
+        }
+        
+        // Debug console functions
+        function addDebugMessage(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const colors = {
+                success: '#00c853',
+                warning: '#ff9800',
+                error: '#d32f2f',
+                info: '#888'
+            };
+            
+            const debugDiv = document.getElementById('debugConsole');
+            const messageDiv = document.createElement('div');
+            messageDiv.style.color = colors[type] || '#fff';
+            messageDiv.innerHTML = `<span style="color: #666;">[${timestamp}]</span> ${message}`;
+            debugDiv.appendChild(messageDiv);
+            debugDiv.scrollTop = debugDiv.scrollHeight;
+            
+            debugLogs.push({ timestamp, message, type });
+        }
+        
+        function clearDebugConsole() {
+            document.getElementById('debugConsole').innerHTML = '<div style="color: #00adb5;">[Bridge] Debug console cleared</div>';
+            debugLogs = [];
+        }
+        
+        function exportDebugLogs() {
+            const dataStr = JSON.stringify(debugLogs, null, 2);
+            const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
+            const exportFileDefaultName = `bridge_debug_${new Date().toISOString()}.json`;
+            
+            const linkElement = document.createElement('a');
+            linkElement.setAttribute('href', dataUri);
+            linkElement.setAttribute('download', exportFileDefaultName);
+            linkElement.click();
+        }
+        
+        async function restartBridge() {
+            if (confirm('Restarting the bridge will temporarily interrupt webhook processing. Continue?')) {
+                addDebugMessage('[Bridge] Attempting to restart...', 'warning');
+                // Note: Actual restart requires process manager like PM2
+                alert('To restart the bridge, run: pm2 restart tradingview-bridge or manually restart the process');
+            }
+        }
+        
+        // Tab switching
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const tabName = btn.dataset.tab;
+                
+                document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                
+                document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
+                document.getElementById(tabName).classList.add('active');
+                
+                if (tabName === 'logs') refreshLogs();
+                if (tabName === 'dashboard') updateStats();
+            });
+        });
+        
+        // Auto-refresh settings
+        document.getElementById('mt4OutputMethod').addEventListener('change', (e) => {
+            toggleHttpEndpoint(e.target.value === 'http');
+        });
+        
+        // Initialize
+        initWebSocket();
+        loadConfig();
+        updateStats();
+        
+        // Refresh stats and logs periodically
+        setInterval(() => {
+            if (document.getElementById('dashboard').classList.contains('active')) {
+                updateStats();
+            }
+            if (document.getElementById('logs').classList.contains('active')) {
+                refreshLogs();
+            }
+        }, 5000);
+    </script>
+</body>
+</html>

@@ -1,0 +1,8 @@
+//@version=6
+indicator("Test Webhook", overlay=true)
+
+// Send alert every minute on the minute
+minuteChange = minute != minute[1]
+
+if minuteChange
+    alert("{\"action\":\"BUY\",\"symbol\":\"" + syminfo.ticker + "\",\"price\":" + str.tostring(close) + ",\"quantity\":0.1}", alert.freq_once_per_bar)

@@ -1,0 +1,5 @@
+node_modules/
+config.json
+webhook_logs.json
+mt4_data/
+.env
