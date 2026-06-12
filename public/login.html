@@ -1,0 +1,140 @@
+cat > public/login.html << 'EOF'
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Login - TradingView Bridge</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        .login-container {
+            background: rgba(0, 0, 0, 0.8);
+            padding: 40px;
+            border-radius: 10px;
+            width: 350px;
+            border: 1px solid #00adb5;
+        }
+        
+        .login-container h2 {
+            color: #00adb5;
+            margin-bottom: 30px;
+            text-align: center;
+        }
+        
+        .input-group {
+            margin-bottom: 20px;
+        }
+        
+        .input-group label {
+            display: block;
+            color: #aaa;
+            margin-bottom: 5px;
+            font-size: 14px;
+        }
+        
+        .input-group input {
+            width: 100%;
+            padding: 12px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid #00adb5;
+            color: white;
+            border-radius: 5px;
+            font-size: 16px;
+        }
+        
+        .input-group input:focus {
+            outline: none;
+            border-color: #00838f;
+        }
+        
+        button {
+            width: 100%;
+            padding: 12px;
+            background: #00adb5;
+            border: none;
+            color: white;
+            border-radius: 5px;
+            font-size: 16px;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+        
+        button:hover {
+            background: #00838f;
+        }
+        
+        .error {
+            color: #ff4444;
+            margin-top: 15px;
+            text-align: center;
+            font-size: 14px;
+        }
+        
+        .info {
+            color: #888;
+            margin-top: 20px;
+            text-align: center;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="login-container">
+        <h2>🔐 Admin Login</h2>
+        <form id="loginForm">
+            <div class="input-group">
+                <label>Username</label>
+                <input type="text" id="username" required autofocus>
+            </div>
+            <div class="input-group">
+                <label>Password</label>
+                <input type="password" id="password" required>
+            </div>
+            <button type="submit">Login</button>
+            <div id="error" class="error"></div>
+            <div class="info">Authorized access only</div>
+        </form>
+    </div>
+    
+    <script>
+        // CHANGE THESE CREDENTIALS TO YOUR OWN
+        const VALID_USERNAME = "Admin";
+        const VALID_PASSWORD = "Weblefthook26$";
+        
+        document.getElementById('loginForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            
+            if (username === VALID_USERNAME && password === VALID_PASSWORD) {
+                sessionStorage.setItem('admin_authenticated', 'true');
+                sessionStorage.setItem('admin_user', username);
+                window.location.href = '/dashboard';
+            } else {
+                document.getElementById('error').innerText = 'Invalid username or password';
+                document.getElementById('password').value = '';
+            }
+        });
+        
+        if (sessionStorage.getItem('admin_authenticated') === 'true') {
+            window.location.href = '/dashboard';
+        }
+    </script>
+</body>
+</html>
+EOF
