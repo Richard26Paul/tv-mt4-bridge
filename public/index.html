@@ -257,13 +257,14 @@
 </head>
 <body>
     <div class="header">
-        <h1>📡 TradingView to MT4 Bridge</h1>
+        <h1>📡 Beto's TradingView to MT4 Bridge</h1>
         <p>Webhook receiver for automated trading signals</p>
     </div>
     
     <div class="nav">
         <button class="tab-btn active" data-tab="dashboard">📊 Dashboard</button>
         <button class="tab-btn" data-tab="logs">📜 Webhook Logs</button>
+        <button class="tab-btn" data-tab="settings">⚙️ Settings</button>
         <button class="tab-btn" data-tab="debug">🐛 Debug Console</button>
         <button class="tab-btn" data-tab="ea">🤖 MT4 Expert Advisor</button>
     </div>
@@ -283,21 +284,18 @@
                     <div class="stat-value" id="rejectedSignals">0</div>
                     <div class="stat-label">Rejected Signals</div>
                 </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="uptime">0s</div>
+                    <div class="stat-label">Uptime</div>
+                </div>
             </div>
             
             <div class="card">
                 <h3>🌐 Webhook Configuration</h3>
                 <div class="webhook-url" id="webhookUrl">Loading...</div>
                 <p style="margin-top: 10px; font-size: 12px; color: #888;">
-                    💡 TradingView cannot send headers. Include token in JSON body:
+                    💡 Include token in JSON body: <code>{"token": "TradingView2026", "action": "BUY", ...}</code>
                 </p>
-                <div class="payload-preview">{
-  "token": "TradingView2026",
-  "action": "BUY",
-  "symbol": "EURUSD",
-  "price": {{close}},
-  "quantity": 0.1
-}</div>
             </div>
             
             <div class="card">
@@ -340,6 +338,36 @@
             </div>
         </div>
         
+        <div id="settings" class="tab">
+            <div class="card">
+                <h3>⚙️ Bridge Configuration</h3>
+                <form id="configForm">
+                    <div class="settings-grid">
+                        <div class="setting-group">
+                            <label>Secret Token</label>
+                            <input type="text" id="secretToken" name="secretToken" placeholder="TradingView2026">
+                        </div>
+                        <div class="setting-group">
+                            <label>MT4 Output Method</label>
+                            <select id="mt4OutputMethod" name="mt4OutputMethod">
+                                <option value="file">File-Based</option>
+                                <option value="http">HTTP Bridge</option>
+                            </select>
+                        </div>
+                        <div class="setting-group" id="httpEndpointGroup">
+                            <label>MT4 HTTP Endpoint</label>
+                            <input type="text" id="mt4HttpEndpoint" name="mt4HttpEndpoint" placeholder="http://localhost:8080/webhook">
+                        </div>
+                        <div class="setting-group">
+                            <label>Log Retention (days)</label>
+                            <input type="number" id="logRetentionDays" name="logRetentionDays">
+                        </div>
+                    </div>
+                    <button type="submit">💾 Save Configuration</button>
+                </form>
+            </div>
+        </div>
+        
         <div id="debug" class="tab">
             <div class="card">
                 <h3>🐛 Live Debug Console</h3>
@@ -350,6 +378,17 @@
                     <button onclick="clearDebugConsole()">Clear Console</button>
                 </div>
             </div>
+            
+            <div class="card">
+                <h3>📊 Sample TradingView Alert Payload</h3>
+                <div class="payload-preview">{
+  "token": "TradingView2026",
+  "action": "BUY",
+  "symbol": "EURUSD",
+  "price": {{close}},
+  "quantity": 0.1
+}</div>
+            </div>
         </div>
         
         <div id="ea" class="tab">
@@ -359,11 +398,6 @@
                 <div style="margin-top: 20px;">
                     <button onclick="downloadEA()" style="font-size: 16px; padding: 12px 24px;">📥 Download Expert Advisor File</button>
                 </div>
-                <div style="margin-top: 20px; background: #1e1e1e; padding: 15px; border-radius: 10px;">
-                    <h4>⚙️ EA Configuration:</h4>
-                    <p><strong>BridgeURL:</strong> <code id="renderUrl">https://tv-mt4-bridge-1.onrender.com</code></p>
-                    <p><strong>ApiToken:</strong> <code>TradingView2026</code></p>
-                </div>
             </div>
         </div>
     </div>
@@ -372,51 +406,81 @@
         <p>TradingView to MT4 Bridge v1.0 | Webhook receiver for automated trading</p>
     </div>
     
+    <script src="/socket.io/socket.io.js"></script>
     <script>
+        let socket = null;
         let debugLogs = [];
         
-        async function sendTestWebhook() {
-            const payload = document.getElementById('testPayload').value;
-            
-            try {
-                const response = await fetch('/webhook', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: payload
-                });
-                
-                const result = await response.json();
-                document.getElementById('testResult').innerHTML = `
-                    <div style="color: ${response.ok ? '#00c853' : '#d32f2f'}">
-                        ${response.ok ? '✅' : '❌'} Test ${response.ok ? 'Successful' : 'Failed'}: ${JSON.stringify(result)}
-                    </div>
-                `;
-                
-                if (response.ok) {
-                    refreshLogs();
-                    updateStats();
-                    addDebugMessage('[Test] Test webhook sent successfully', 'success');
-                }
-            } catch (error) {
-                document.getElementById('testResult').innerHTML = `<div style="color: #d32f2f;">❌ Error: ${error.message}</div>`;
-                addDebugMessage(`[Test] Error: ${error.message}`, 'error');
-            }
+        function initWebSocket() {
+            socket = io();
+            socket.on('connect', () => {
+                addDebugMessage('[WebSocket] Connected to bridge server', 'success');
+                socket.emit('get-logs');
+            });
+            socket.on('new-log', (log) => {
+                addDebugMessage(`[Webhook] ${log.status} - ${JSON.stringify(log.payload).substring(0, 100)}`, 
+                    log.status === 'ACCEPTED' ? 'success' : 'warning');
+                refreshLogs();
+                updateStats();
+            });
+            socket.on('initial-logs', (logs) => {
+                addDebugMessage(`[System] Loaded ${logs.length} historical log entries`, 'info');
+            });
+            socket.on('disconnect', () => {
+                addDebugMessage('[WebSocket] Disconnected from server', 'error');
+            });
         }
+        
+        async function loadConfig() {
+            const response = await fetch('/api/config');
+            const config = await response.json();
+            document.getElementById('secretToken').value = config.secretToken === '***hidden***' ? '' : config.secretToken;
+            document.getElementById('mt4OutputMethod').value = config.mt4OutputMethod;
+            document.getElementById('mt4HttpEndpoint').value = config.mt4HttpEndpoint;
+            document.getElementById('logRetentionDays').value = config.logRetentionDays;
+            toggleHttpEndpoint(config.mt4OutputMethod === 'http');
+            const webhookUrl = `${window.location.protocol}//${window.location.host}/webhook`;
+            document.getElementById('webhookUrl').innerHTML = `<strong>Webhook URL:</strong> ${webhookUrl}<br><strong>Token:</strong> TradingView2026 (in JSON body)`;
+        }
+        
+        function toggleHttpEndpoint(show) {
+            document.getElementById('httpEndpointGroup').style.display = show ? 'block' : 'none';
+        }
+        
+        document.getElementById('configForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const config = {
+                secretToken: document.getElementById('secretToken').value,
+                mt4OutputMethod: document.getElementById('mt4OutputMethod').value,
+                mt4HttpEndpoint: document.getElementById('mt4HttpEndpoint').value,
+                logRetentionDays: parseInt(document.getElementById('logRetentionDays').value)
+            };
+            const response = await fetch('/api/config', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(config)
+            });
+            if (response.ok) {
+                addDebugMessage('[Config] Settings saved successfully', 'success');
+                alert('Configuration saved! Restart the bridge for changes to take effect.');
+            } else {
+                addDebugMessage('[Config] Failed to save settings', 'error');
+                alert('Failed to save configuration');
+            }
+        });
         
         async function refreshLogs() {
             const response = await fetch('/api/logs?limit=50');
             const logs = await response.json();
             const tbody = document.getElementById('logsTableBody');
-            
             if (logs.length === 0) {
                 tbody.innerHTML = '<tr><td colspan="5" style="text-align: center;">No logs yet</td></tr>';
                 return;
             }
-            
             tbody.innerHTML = logs.map(log => `
                 <tr>
                     <td>${new Date(log.timestamp).toLocaleString()}</td>
-                    <td><span class="status-badge ${log.status === 'ACCEPTED' ? 'badge-success' : 'badge-danger'}">${log.status}</span></td>
+                    <td><span class="status-badge ${log.status === 'ACCEPTED' ? 'badge-success' : (log.status === 'REJECTED' ? 'badge-danger' : 'badge-warning')}">${log.status}</span></td>
                     <td>${log.payload?.action || 'N/A'}</td>
                     <td>${log.payload?.symbol || 'N/A'}</td>
                     <td><small>${JSON.stringify(log.payload).substring(0, 100)}...</small></td>
@@ -436,17 +500,51 @@
         async function updateStats() {
             const response = await fetch('/api/status');
             const status = await response.json();
-            
             const logsResponse = await fetch('/api/logs?limit=500');
             const logs = await logsResponse.json();
-            
             const total = logs.length;
             const accepted = logs.filter(l => l.status === 'ACCEPTED').length;
             const rejected = logs.filter(l => l.status === 'REJECTED').length;
-            
             document.getElementById('totalSignals').textContent = total;
             document.getElementById('acceptedSignals').textContent = accepted;
             document.getElementById('rejectedSignals').textContent = rejected;
+            document.getElementById('uptime').textContent = formatUptime(status.uptime);
+        }
+        
+        function formatUptime(seconds) {
+            const days = Math.floor(seconds / 86400);
+            const hours = Math.floor((seconds % 86400) / 3600);
+            const minutes = Math.floor((seconds % 3600) / 60);
+            const secs = Math.floor(seconds % 60);
+            if (days > 0) return `${days}d ${hours}h`;
+            if (hours > 0) return `${hours}h ${minutes}m`;
+            if (minutes > 0) return `${minutes}m ${secs}s`;
+            return `${secs}s`;
+        }
+        
+        async function sendTestWebhook() {
+            const payload = document.getElementById('testPayload').value;
+            try {
+                const response = await fetch('/webhook', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: payload
+                });
+                const result = await response.json();
+                document.getElementById('testResult').innerHTML = `
+                    <div style="color: ${response.ok ? '#00c853' : '#d32f2f'}">
+                        ${response.ok ? '✅' : '❌'} Test ${response.ok ? 'Successful' : 'Failed'}: ${JSON.stringify(result)}
+                    </div>
+                `;
+                if (response.ok) {
+                    refreshLogs();
+                    updateStats();
+                    addDebugMessage('[Test] Test webhook sent successfully', 'success');
+                }
+            } catch (error) {
+                document.getElementById('testResult').innerHTML = `<div style="color: #d32f2f;">❌ Error: ${error.message}</div>`;
+                addDebugMessage(`[Test] Error: ${error.message}`, 'error');
+            }
         }
         
         function downloadEA() {
@@ -457,30 +555,18 @@
         function addDebugMessage(message, type = 'info') {
             const timestamp = new Date().toLocaleTimeString();
             const colors = { success: '#00c853', warning: '#ff9800', error: '#d32f2f', info: '#888' };
-            
             const debugDiv = document.getElementById('debugConsole');
             const messageDiv = document.createElement('div');
             messageDiv.style.color = colors[type] || '#fff';
             messageDiv.innerHTML = `<span style="color: #666;">[${timestamp}]</span> ${message}`;
             debugDiv.appendChild(messageDiv);
             debugDiv.scrollTop = debugDiv.scrollHeight;
+            debugLogs.push({ timestamp, message, type });
         }
         
         function clearDebugConsole() {
             document.getElementById('debugConsole').innerHTML = '<div style="color: #00adb5;">[Bridge] Debug console cleared</div>';
-        }
-        
-        async function loadConfig() {
-            try {
-                const response = await fetch('/api/config');
-                const config = await response.json();
-                const webhookUrl = `https://${window.location.hostname}/webhook`;
-                document.getElementById('webhookUrl').innerHTML = `<strong>Webhook URL:</strong> ${webhookUrl}<br><strong>Token:</strong> TradingView2026`;
-                document.getElementById('renderUrl').innerHTML = `https://${window.location.hostname}`;
-            } catch(e) {
-                document.getElementById('webhookUrl').innerHTML = `<strong>Webhook URL:</strong> https://${window.location.hostname}/webhook<br><strong>Token:</strong> TradingView2026`;
-                document.getElementById('renderUrl').innerHTML = `https://${window.location.hostname}`;
-            }
+            debugLogs = [];
         }
         
         document.querySelectorAll('.tab-btn').forEach(btn => {
@@ -495,8 +581,12 @@
             });
         });
         
+        document.getElementById('mt4OutputMethod').addEventListener('change', (e) => {
+            toggleHttpEndpoint(e.target.value === 'http');
+        });
+        
+        initWebSocket();
         loadConfig();
-        refreshLogs();
         updateStats();
         setInterval(() => {
             if (document.getElementById('dashboard').classList.contains('active')) updateStats();
