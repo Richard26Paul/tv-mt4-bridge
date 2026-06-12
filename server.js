@@ -7,6 +7,7 @@ const http = require('http');
 const socketIo = require('socket.io');
 const helmet = require('helmet');
 const chalk = require('chalk');
+const auth = require('basic-auth');
 
 const app = express();
 const server = http.createServer(app);
@@ -58,6 +59,23 @@ app.use(cors());
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 
+// Admin authentication middleware
+const ADMIN_USERNAME = process.env.ADMIN_USERNAME || 'admin';
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'TradingView2026Admin';
+
+const authenticateAdmin = (req, res, next) => {
+  const credentials = auth(req);
+  
+  if (!credentials || 
+      credentials.name !== ADMIN_USERNAME || 
+      credentials.pass !== ADMIN_PASSWORD) {
+    res.setHeader('WWW-Authenticate', 'Basic realm="TradingView Bridge Admin"');
+    return res.status(401).send('Authentication required to access admin panel');
+  }
+  next();
+};
+
+// Webhook authentication (kept separate and public)
 const authenticateWebhook = (req, res, next) => {
   const token = req.headers['x-webhook-token'] || req.query.token || req.body.token;
   if (!token || token !== config.secretToken) {
@@ -137,16 +155,17 @@ app.get('/test', (req, res) => {
   res.json({ status: 'test_success', message: 'Bridge is running' });
 });
 
-app.get('/api/config', (req, res) => {
+// Protected admin routes (require authentication)
+app.get('/api/config', authenticateAdmin, (req, res) => {
   res.json({ ...config, secretToken: '***hidden***' });
 });
 
-app.get('/api/logs', (req, res) => {
+app.get('/api/logs', authenticateAdmin, (req, res) => {
   const limit = parseInt(req.query.limit) || 50;
   res.json(webhookLogs.slice(0, limit));
 });
 
-app.delete('/api/logs', (req, res) => {
+app.delete('/api/logs', authenticateAdmin, (req, res) => {
   webhookLogs = [];
   fs.writeJsonSync(logsFile, webhookLogs, { spaces: 2 });
   res.json({ success: true });
@@ -167,7 +186,7 @@ app.get('/api/latest-signal', authenticateWebhook, (req, res) => {
   res.json(signal);
 });
 
-app.get('/api/generate-ea', (req, res) => {
+app.get('/api/generate-ea', authenticateAdmin, (req, res) => {
   res.setHeader('Content-Type', 'application/x-mq4');
   res.setHeader('Content-Disposition', 'attachment; filename="TradingViewBridge_EA.mq4"');
   res.send('//+------------------------------------------------------------------+\n//| TradingView Bridge EA                                              |\n//+------------------------------------------------------------------+\n#property copyright "TradingView Bridge"\n#property version   "1.00"\n#property strict\n\ninput string   DataFolder = "Bridge_Data";\ninput int      CheckInterval = 1;\ninput double   DefaultLotSize = 0.1;\ninput int      Slippage = 3;\ninput bool     AutoClose = true;\ninput string   MagicNumberStr = "TV_BRIDGE";\n\nstring dataPath;\nint magicNumber;\n\nint OnInit() {\n   magicNumber = 0;\n   for(int i = 0; i < StringLen(MagicNumberStr); i++) {\n      magicNumber += StringGetChar(MagicNumberStr, i);\n   }\n   dataPath = TerminalInfoString(TERMINAL_DATA_PATH) + "\\\\MQL4\\\\Files\\\\" + DataFolder + "\\\\";\n   Print("EA Initialized - Path: ", dataPath);\n   return(INIT_SUCCEEDED);\n}\n\nvoid OnTick() {\n   static datetime lastCheck = 0;\n   if(TimeCurrent() - lastCheck >= CheckInterval) {\n      lastCheck = TimeCurrent();\n      CheckForSignals();\n   }\n}\n\nvoid CheckForSignals() {\n   string fileName = "current_signal.json";\n   string filePath = dataPath + fileName;\n   \n   if(FileIsExist(fileName, 0)) {\n      int handle = FileOpen(fileName, FILE_READ|FILE_TXT);\n      if(handle != INVALID_HANDLE) {\n         string content = FileReadString(handle);\n         FileClose(handle);\n         \n         string action = ParseJSON(content, "action");\n         string symbol = ParseJSON(content, "symbol");\n         double price = StringToDouble(ParseJSON(content, "price"));\n         double lots = StringToDouble(ParseJSON(content, "quantity"));\n         if(lots <= 0) lots = DefaultLotSize;\n         \n         if(action == "BUY") {\n            OrderSend(symbol, OP_BUY, lots, MarketInfo(symbol, MODE_ASK), Slippage, 0, 0, "TV_Bridge", magicNumber, 0, clrGreen);\n            Print("BUY order sent for ", symbol);\n         } else if(action == "SELL") {\n            OrderSend(symbol, OP_SELL, lots, MarketInfo(symbol, MODE_BID), Slippage, 0, 0, "TV_Bridge", magicNumber, 0, clrRed);\n            Print("SELL order sent for ", symbol);\n         }\n         \n         FileDelete(fileName);\n      }\n   }\n}\n\nstring ParseJSON(string json, string key) {\n   string search = "\\"" + key + "\\"";\n   int pos = StringFind(json, search);\n   if(pos == -1) return "";\n   pos = StringFind(json, ":", pos);\n   if(pos == -1) return "";\n   pos++;\n   while(StringSubstr(json, pos, 1) == " ") pos++;\n   \n   if(StringSubstr(json, pos, 1) == "\\"") {\n      pos++;\n      int end = StringFind(json, "\\"", pos);\n      if(end > pos) return StringSubstr(json, pos, end - pos);\n   } else {\n      int end = pos;\n      while(end < StringLen(json)) {\n         string ch = StringSubstr(json, end, 1);\n         if(ch == "," || ch == "}" || ch == " ") break;\n         end++;\n      }\n      if(end > pos) return StringSubstr(json, pos, end - pos);\n   }\n   return "";\n}');
@@ -175,10 +194,12 @@ app.get('/api/generate-ea', (req, res) => {
 
 app.use(express.static('public'));
 
-app.get('/', (req, res) => {
+// Protected dashboard routes
+app.get('/', authenticateAdmin, (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
+// WebSocket connection (no auth needed for real-time logs, but logs are protected via API)
 io.on('connection', (socket) => {
   console.log(chalk.cyan('WebSocket client connected'));
   socket.emit('initial-logs', webhookLogs.slice(0, 50));
@@ -192,5 +213,6 @@ server.listen(PORT, '0.0.0.0', () => {
   console.log(chalk.green('========================================\n'));
   console.log(chalk.cyan(`Webhook URL: http://localhost:${PORT}/webhook`));
   console.log(chalk.yellow(`Token: ${config.secretToken}`));
-  console.log(chalk.cyan(`Dashboard: http://localhost:${PORT}\n`));
+  console.log(chalk.cyan(`Dashboard: http://localhost:${PORT}`));
+  console.log(chalk.yellow(`Admin Login: ${ADMIN_USERNAME} / ${ADMIN_PASSWORD}`));
 });
