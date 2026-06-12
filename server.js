@@ -19,7 +19,7 @@ const io = socketIo(server, {
 
 const configPath = path.join(__dirname, 'config.json');
 let config = {
-  port: 80,
+  port: process.env.PORT || 80,
   secretToken: 'TradingView2026',
   mt4OutputMethod: 'file',
   mt4HttpEndpoint: 'http://localhost:8080/webhook',
@@ -184,12 +184,13 @@ io.on('connection', (socket) => {
   socket.emit('initial-logs', webhookLogs.slice(0, 50));
 });
 
-server.listen(config.port, '0.0.0.0', () => {
+const PORT = process.env.PORT || config.port;
+server.listen(PORT, '0.0.0.0', () => {
   console.log(chalk.green('\n========================================'));
   console.log(chalk.green('TradingView to MT4 Bridge v1.0'));
-  console.log(chalk.green(`Running on http://0.0.0.0:${config.port}`));
+  console.log(chalk.green(`Running on http://0.0.0.0:${PORT}`));
   console.log(chalk.green('========================================\n'));
-  console.log(chalk.cyan(`Webhook URL: http://localhost:${config.port}/webhook`));
+  console.log(chalk.cyan(`Webhook URL: http://localhost:${PORT}/webhook`));
   console.log(chalk.yellow(`Token: ${config.secretToken}`));
-  console.log(chalk.cyan(`Dashboard: http://localhost:${config.port}\n`));
+  console.log(chalk.cyan(`Dashboard: http://localhost:${PORT}\n`));
 });
