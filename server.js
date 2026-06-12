@@ -9,6 +9,7 @@ const helmet = require('helmet');
 const chalk = require('chalk');
 
 const app = express();
+const startTime = Date.now();
 const server = http.createServer(app);
 const io = socketIo(server, {
   cors: {
@@ -92,6 +93,8 @@ function sendToMT4File(signal) {
     const mt4Signal = { timestamp: new Date().toISOString(), unixTime: timestamp, ...signal, processed: false };
     fs.writeJsonSync(filePath, mt4Signal, { spaces: 2 });
     console.log(chalk.green(`Signal written: ${fileName}`));
+    const currentSignalPath = path.join(config.mt4DataFolder, 'current_signal.json');
+    fs.writeJsonSync(currentSignalPath, mt4Signal, { spaces: 2 });
     return { success: true, filePath };
   } catch (error) {
     console.log(chalk.red(`File error: ${error.message}`));
@@ -139,13 +142,42 @@ app.get('/api/config', (req, res) => {
   res.json({ ...config, secretToken: '***hidden***' });
 });
 
+app.post('/api/config', (req, res) => {
+  const newConfig = req.body;
+  if (!newConfig.secretToken || newConfig.secretToken === '***hidden***') {
+    delete newConfig.secretToken;
+  }
+  Object.assign(config, newConfig);
+  fs.writeJsonSync(configPath, config, { spaces: 2 });
+  console.log(chalk.green('[CONFIG] Configuration updated'));
+  res.json({ success: true, config: { ...config, secretToken: '***hidden***' } });
+});
+
 app.get('/api/logs', (req, res) => {
-  const limit = parseInt(req.query.limit) || 50;
+  const limit = parseInt(req.query.limit) || 100;
   res.json(webhookLogs.slice(0, limit));
+});
+
+app.get('/api/status', (req, res) => {
+  res.json({
+    running: true,
+    uptime: (Date.now() - startTime) / 1000,
+    mt4Method: config.mt4OutputMethod,
+    mt4Folder: config.mt4DataFolder,
+    totalLogs: webhookLogs.length,
+    recentLogs: webhookLogs.slice(0, 5)
+  });
 });
 
 app.delete('/api/logs', (req, res) => {
   webhookLogs = [];
+  fs.writeJsonSync(logsFile, webhookLogs, { spaces: 2 });
+  res.json({ success: true });
+});
+
+app.delete('/api/logs/:id', (req, res) => {
+  const id = parseInt(req.params.id);
+  webhookLogs = webhookLogs.filter(log => log.id !== id);
   fs.writeJsonSync(logsFile, webhookLogs, { spaces: 2 });
   res.json({ success: true });
 });
