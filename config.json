@@ -1,0 +1,9 @@
+{
+  "port": 3050,
+  "secretToken": "TradingView2026",
+  "mt4OutputMethod": "file",
+  "mt4HttpEndpoint": "http://localhost:8080/webhook",
+  "mt4DataFolder": "/home/Taurus/Desktop/tradingview-mt4-bridge/mt4_data",
+  "logRetentionDays": 7,
+  "enableDebugging": true
+}
