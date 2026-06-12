@@ -1,4 +1,3 @@
-cat > server.js << 'EOF'
 const express = require('express');
 const bodyParser = require('body-parser');
 const cors = require('cors');
@@ -93,8 +92,6 @@ function sendToMT4File(signal) {
     const mt4Signal = { timestamp: new Date().toISOString(), unixTime: timestamp, ...signal, processed: false };
     fs.writeJsonSync(filePath, mt4Signal, { spaces: 2 });
     console.log(chalk.green(`Signal written: ${fileName}`));
-    const currentSignalPath = path.join(config.mt4DataFolder, 'current_signal.json');
-    fs.writeJsonSync(currentSignalPath, mt4Signal, { spaces: 2 });
     return { success: true, filePath };
   } catch (error) {
     console.log(chalk.red(`File error: ${error.message}`));
@@ -176,16 +173,8 @@ app.get('/api/generate-ea', (req, res) => {
 
 app.use(express.static('public'));
 
-app.get('/dashboard', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
-});
-
-app.get('/login', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'login.html'));
-});
-
 app.get('/', (req, res) => {
-  res.redirect('/login');
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
 io.on('connection', (socket) => {
@@ -201,7 +190,5 @@ server.listen(PORT, '0.0.0.0', () => {
   console.log(chalk.green('========================================\n'));
   console.log(chalk.cyan(`Webhook URL: http://localhost:${PORT}/webhook`));
   console.log(chalk.yellow(`Token: ${config.secretToken}`));
-  console.log(chalk.cyan(`Dashboard: http://localhost:${PORT}/dashboard`));
-  console.log(chalk.yellow(`Login: http://localhost:${PORT}/login`));
+  console.log(chalk.cyan(`Dashboard: http://localhost:${PORT}\n`));
 });
-EOF
